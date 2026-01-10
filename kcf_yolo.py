@@ -5,9 +5,10 @@ from time import perf_counter
 
 # --- CONFIGURATION ---
 SCALE_FACTOR = 1
-DETECTION_INTERVAL = 1
-CONFIDENCE_THRESHOLD = 0.2
-DISTANCE_THRESHOLD = 30  # Pixels. If center distance > this, it's a new object.
+DETECTION_INTERVAL = 10
+CONFIDENCE_THRESHOLD = 0.25
+DISTANCE_THRESHOLD = 20  # Pixels. If center distance > this, it's a new object.
+# TRACKER_CLASS = cv2.TrackerCSRT_create
 TRACKER_CLASS = cv2.TrackerKCF_create
 
 
@@ -58,7 +59,7 @@ while True:
     
     if frame_count % DETECTION_INTERVAL == 0:
         # 1. DETECT
-        results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, classes=[0])
+        results = model(original_frame, conf=CONFIDENCE_THRESHOLD, verbose=False, classes=[0], imgsz=640)
         
         # Parse YOLO detections into a clean list of [x, y, w, h]
         detections = []
@@ -75,7 +76,7 @@ while True:
             obj['updated'] = False
 
         for det_box in detections:
-            det_center = get_center(det_box)
+            det_center = [int(value*SCALE_FACTOR) for value in get_center(det_box)]
             
             matched_obj = None
             min_dist = float('inf')
@@ -100,13 +101,13 @@ while True:
                 # We do NOT increment the ID, we keep matched_obj['id']
                 if not matched_obj['updated']: # Prevent multiple detections claiming one tracker
                     matched_obj['tracker'] = TRACKER_CLASS()
-                    matched_obj['tracker'].init(frame, det_box)
+                    matched_obj['tracker'].init(frame, [int(value*SCALE_FACTOR) for value in det_box])
                     matched_obj['last_bbox'] = det_box
                     matched_obj['updated'] = True
             else:
                 # NO -> It's a new object
                 new_tracker = TRACKER_CLASS()
-                new_tracker.init(frame, det_box)
+                new_tracker.init(frame, [int(value*SCALE_FACTOR) for value in det_box])
                 trackers.append({
                     'tracker': new_tracker,
                     'id': global_id_counter,
@@ -142,7 +143,7 @@ while True:
 
     for obj in trackers:
         bbox = obj['last_bbox']
-        bbox_center = get_center(bbox)
+        bbox_center = [int(value*SCALE_FACTOR) for value in get_center(bbox)]
         if point_in_roi(roi, bbox_center):
             if obj['id'] not in ids_in_roi:
                 ids_in_roi.append(obj['id'])
