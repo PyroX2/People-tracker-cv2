@@ -1,6 +1,7 @@
 import cv2
 import math
 from ultralytics import YOLO
+from time import perf_counter
 
 # --- CONFIGURATION ---
 SCALE_FACTOR = 1
@@ -42,6 +43,9 @@ roi_x1, roi_y1 = roi_x, roi_y
 roi_x2 = roi_x + roi_w
 roi_y2 = roi_y + roi_h
 roi = [roi_x1, roi_y1, roi_x2, roi_y2]
+
+# For calculating fps
+start_time = perf_counter()
 
 while True:
     ret, original_frame = video.read()
@@ -145,9 +149,14 @@ while True:
 
     cv2.putText(frame, f"People counter: {len(ids_in_roi)}", (5, 15), 0, 0.5, (0, 0, 255), 2)
 
+    # Measure fps
+    curr_time = perf_counter()
+    fps = frame_count / (curr_time - start_time)
+    cv2.putText(frame, f"FPS: {fps:.2f}", (5, 35), 0, 0.5, (0, 0, 255), 2)
+    prev_time = curr_time
 
     frame_count += 1
-    cv2.imshow("Tracking", frame)
+    cv2.imshow("Tracking", cv2.resize(frame, None, fx=1/SCALE_FACTOR, fy=1/SCALE_FACTOR))
     
     k = cv2.waitKey(1) & 0xff
     if k == ord('q'): break
