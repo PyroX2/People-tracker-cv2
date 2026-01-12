@@ -13,15 +13,18 @@ DISTANCE_THRESHOLD = 30  # Pixels. If center distance > this, it's a new object.
 # TRACKER_CLASS = cv2.TrackerKCF_create
 TRACKER_CLASS = TrackerReliabilityKCF_create
 
-
+# Create yolo model for detection people
 model = YOLO("models/yolov8x.pt") 
-video = cv2.VideoCapture("data/aerial-view-of-crowds-2.mp4")
 
-trackers = []
-frame_count = 0
-global_id_counter = 1
+# Create video reader
+video = cv2.VideoCapture("data/video_4.mp4")
+
+trackers = []   # List for storing all trackers
+frame_count = 0 # Number of frames processed
+global_id_counter = 1   # Global ID that counts number of unique people tracked since the beggining
 ids_in_roi = []  # Ids of objects that entered ROI
 
+# Function that returns center point of bounding box
 def get_center(bbox):
     """Calculates the center point (x, y) of a bounding box."""
     x, y, w, h = bbox
@@ -29,6 +32,7 @@ def get_center(bbox):
     cy = y + h / 2
     return cx, cy
 
+# Function that checks if point is inside the ROI
 def point_in_roi(roi, point):
     roi_x1, roi_y1, roi_x2, roi_y2 = roi
     x, y = point
@@ -38,8 +42,11 @@ def point_in_roi(roi, point):
         return False
 
 
-ret, first_frame = video.read()
-first_frame = cv2.resize(first_frame, None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
+ret, first_frame = video.read() # Read first frame
+
+first_frame = cv2.resize(first_frame, None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)   # Resize image for faster processing
+
+# ROI selection for people counting
 roi_x, roi_y, roi_w, roi_h = cv2.selectROI("Tracking", first_frame, showCrosshair=True)
 roi_x1, roi_y1 = roi_x, roi_y
 roi_x2 = roi_x + roi_w
@@ -53,19 +60,17 @@ while True:
     ret, original_frame = video.read()
     if not ret: break
     
+    # Resize image for faster processing
     frame = cv2.resize(original_frame, None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
-    
-    # Draw ROI
-    cv2.rectangle(frame, (roi_x1, roi_y1), (roi_x2, roi_y2), (0, 0, 255), 2)
-    
+        
     if frame_count % DETECTION_INTERVAL == 0:
-        # 1. DETECT
+        # Detect people using YOLO
         results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, classes=[0], imgsz=640)
         
         # Parse YOLO detections into a clean list of [x, y, w, h]
         detections = []
         for result in results:
-            for box in result.boxes:
+            for box in result.boxes:    # Get the left top corner of bbox, width and height 
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                 w = int(x2 - x1)
                 h = int(y2 - y1)
@@ -150,6 +155,9 @@ while True:
                 ids_in_roi.append(obj['id'])
 
     cv2.putText(frame, f"People counter: {len(ids_in_roi)}", (5, 15), 0, 0.5, (0, 0, 255), 2)
+
+    # Draw ROI
+    cv2.rectangle(frame, (roi_x1, roi_y1), (roi_x2, roi_y2), (0, 0, 255), 2)
 
     # Measure fps
     curr_time = perf_counter()
