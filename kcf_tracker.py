@@ -256,13 +256,6 @@ class ReliabilityKCFTracker:
     def update(self, image):
         if self._roi is None: return False, (0,0,0,0)
 
-        x_center, y_center = self._roi[0] + self._roi[2] // 2, self._roi[1] + self._roi[3] // 2
-
-        x_low_lim, x_high_lim = image.shape[1]*self.dead_zone, image.shape[1] - image.shape[1]*self.dead_zone
-        y_low_lim, y_high_lim = image.shape[0]*self.dead_zone, image.shape[0] - image.shape[0]*self.dead_zone
-        if (x_low_lim > x_center or x_high_lim < x_center) or (y_low_lim > y_center or y_high_lim < y_center):
-            return False, (0, 0, 0, 0)
-
         # 1. KCF Detection Step (Fast Texture Match)
         patch = self._get_subwindow(image, self._roi, self._template_size)
         zf = np.fft.fft2(patch, axes=(0,1))
