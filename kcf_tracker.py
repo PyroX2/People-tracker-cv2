@@ -230,8 +230,8 @@ class ReliabilityKCFTracker:
         hsv_roi = cv2.cvtColor(roi_patch, cv2.COLOR_BGR2HSV)
         
         # Calculate Histogram (Hue and Saturation only, ignore Value/Brightness)
-        # 16 bins for Hue, 16 for Saturation
-        self._hist = cv2.calcHist([hsv_roi], [0, 1], None, [16, 16], [0, 180, 0, 256])
+        # 4 bins for Hue, 4 for Saturation
+        self._hist = cv2.calcHist([hsv_roi], [0, 1], None, [4, 4], [0, 180, 0, 256])
         cv2.normalize(self._hist, self._hist, 0, 255, cv2.NORM_MINMAX)
 
         # 2. Standard KCF Init
