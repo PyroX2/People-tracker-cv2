@@ -51,7 +51,7 @@ class Segmentator:
 
         pred_seg = self.predict(person_img)
 
-        mask = pred_seg > 0
+        mask = pred_seg == 4
         
         masked_pixels = person_img[mask]
 
