@@ -3,12 +3,14 @@ import math
 from ultralytics import YOLO
 from time import perf_counter
 from kcf_tracker import TrackerKCF_create, TrackerReliabilityKCF_create
+from segment import Segmentator
+
 
 # --- CONFIGURATION ---
 SCALE_FACTOR = 1
-DETECTION_INTERVAL = 1
+DETECTION_INTERVAL = 5
 CONFIDENCE_THRESHOLD = 0.35
-MISSES_ALLOWED = 5
+MISSES_ALLOWED = 2
 IOU_THRESHOLD = 0.3
 DISTANCE_THRESHOLD = 50  # Pixels. If center distance > this, it's a new object.
 # TRACKER_CLASS = cv2.TrackerCSRT_create
@@ -81,6 +83,8 @@ roi_x2 = roi_x + roi_w
 roi_y2 = roi_y + roi_h
 roi = [roi_x1, roi_y1, roi_x2, roi_y2]
 
+segmentator = Segmentator()
+
 # For calculating fps
 start_time = perf_counter()
 
@@ -90,7 +94,9 @@ while True:
     
     # Resize image for faster processing
     frame = cv2.resize(original_frame, None, fx=SCALE_FACTOR, fy=SCALE_FACTOR)
-        
+
+    original_frame = frame.copy()
+
     if frame_count % DETECTION_INTERVAL == 0:
         # Detect people using YOLO
         results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False, classes=[0], imgsz=640, iou=0.2)
@@ -181,6 +187,7 @@ while True:
                     'color': (0, 255, 0),
                     'last_bbox': det_box,
                     'updated': True,
+                    'misses_counter': 0
                 })
                 global_id_counter += 1
 
@@ -198,8 +205,7 @@ while True:
 
 
         # trackers = [obj for obj in trackers if obj['updated']]
-            
-            
+
     # else:
     # TRACKING LOOP (Intermediate frames)
     for obj in trackers:
@@ -207,11 +213,17 @@ while True:
         # success = True
         # bbox = obj['last_bbox']
 
+        # If object was not detected dont draw it
+        if obj['misses_counter'] > 0:
+            continue
+
         bbox = xywh2xyxy(bbox)
         
         if success:
             # Store bbox for the next distance calculation
             obj['last_bbox'] = bbox
+
+            dominant_color = segmentator.get_dominant_color(original_frame, bbox)
             
             p1 = (int(bbox[0]), int(bbox[1]))
             p2 = (int(bbox[2]), int(bbox[3]))
