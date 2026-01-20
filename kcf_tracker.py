@@ -188,7 +188,6 @@ import cv2
 
 class ReliabilityKCFTracker:
     def __init__(self):
-        # --- KCF Parameters ---
         self.lambdar = 0.0001
         self.sigma = 0.5
         self.output_sigma_factor = 0.125
@@ -197,10 +196,10 @@ class ReliabilityKCFTracker:
         self.cell_size = 1
         self.dead_zone = 0.07
         
-        # --- RELIABILITY PARAMETERS (The CSRT-like part) ---
-        # If the color match score drops below this, we stop LEARNING (prevent poisoning)
+        # if the color match score drops below this we stop learning
         self.learning_thresh = 0.4
-        # If the color match score drops below this, we declare LOSS
+
+        # if the color match score drops below this we declare loss
         self.loss_thresh = 0.15
         
         self._roi = None
@@ -209,7 +208,6 @@ class ReliabilityKCFTracker:
         self._hann = None
         self._template_size = [0, 0]
         
-        # Histogram for Color Reliability
         self._hist = None
 
     def init(self, image, bbox):
@@ -221,8 +219,6 @@ class ReliabilityKCFTracker:
         self._roi = [x, y, w, h]
         self._template_size = [padded_w, padded_h]
 
-        # 1. Initialize Color Histogram (The "Reliability" Model)
-        # We look strictly inside the bounding box (no padding) for color init
         roi_patch = image[y:y+h, x:x+w]
         if roi_patch.size == 0: return False
         
@@ -230,8 +226,8 @@ class ReliabilityKCFTracker:
         hsv_roi = cv2.cvtColor(roi_patch, cv2.COLOR_BGR2HSV)
         
         # Calculate Histogram (Hue and Saturation only, ignore Value/Brightness)
-        # 4 bins for Hue, 4 for Saturation
-        self._hist = cv2.calcHist([hsv_roi], [0, 1], None, [4, 4], [0, 180, 0, 256])
+        # 16 bins for Hue, 16 for Saturation
+        self._hist = cv2.calcHist([hsv_roi], [0, 1], None, [16, 16], [0, 180, 0, 256])
         cv2.normalize(self._hist, self._hist, 0, 255, cv2.NORM_MINMAX)
 
         # 2. Standard KCF Init
@@ -329,8 +325,33 @@ class ReliabilityKCFTracker:
         x, y, w, h = map(int, roi)
         cx, cy = x + w // 2, y + h // 2
         tw, th = template_size
-        
-        patch = cv2.getRectSubPix(image, (tw, th), (cx, cy))
+
+        patch = np.zeros((th, tw, 3))
+
+        x1, y1 = cx - tw // 2, cy - th // 2
+        x2, y2 = cx + int(tw // 2), cy + int(th // 2)
+
+        left_padding = 0
+        right_padding = 0
+        top_padding = 0
+        bottom_padding = 0
+
+        img_h, img_w, _ = image.shape
+
+        if x2 > img_w:
+            right_padding = x2 - img_w
+            x2 = img_w
+        if x1 < 0:
+            left_padding = -x1
+            x1 = 0
+        if y2 > img_h:
+            bottom_padding = y2 - img_h
+            y2 = img_h
+        if y1 < 0:
+            top_padding = -y1
+            y1 = 0
+
+        patch[top_padding:(top_padding+y2-y1), left_padding:(left_padding+x2-x1)] = image[y1:y2, x1:x2]
         patch = patch.astype(np.float32) / 255.0
         return patch * self._hann
 
