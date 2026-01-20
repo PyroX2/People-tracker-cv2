@@ -2,7 +2,7 @@ import cv2
 import math
 from ultralytics import YOLO
 from time import perf_counter
-from kcf_tracker import TrackerKCF_create, TrackerReliabilityKCF_create
+from kcf_tracker import TrackerKCF_create
 from segment import Segmentator
 
 
@@ -15,7 +15,7 @@ IOU_THRESHOLD = 0.3
 DISTANCE_THRESHOLD = 50  # Pixels. If center distance > this, it's a new object.
 # TRACKER_CLASS = cv2.TrackerCSRT_create
 # TRACKER_CLASS = cv2.TrackerKCF_create
-TRACKER_CLASS = TrackerReliabilityKCF_create
+TRACKER_CLASS = TrackerKCF_create
 
 last_click = None
 
@@ -129,18 +129,6 @@ def main():
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                     detections.append((int(x1), int(y1), int(x2), int(y2)))
 
-            """
-            BBOX cleaning procedure:
-                - check IoU between detection bounding box and existing track
-                    - if it is greater than THRESHOLD it is the same object so the ID stays the same
-                        This is check for all trackers even those that were lost previously
-                    - if not we check if distance between the center of detection bounding box and center of tracks that 
-                        were not updated is smaller than DISTANCE_THRESHOLD. This allows for restoration of lost tracks
-                    - if bounding box was not matched using IoU or distance we assume that it is a new object and we should
-                        create a new tracker for it.
-            """
-            
-
             # Mark all current trackers as "not updated" for this frame
             for obj in trackers:
                 obj['updated'] = False
@@ -227,8 +215,6 @@ def main():
 
             # trackers = [obj for obj in trackers if obj['updated']]
 
-        # else:
-        # TRACKING LOOP (Intermediate frames)
         for obj in trackers:
             success, bbox = obj['tracker'].update(frame)
 
