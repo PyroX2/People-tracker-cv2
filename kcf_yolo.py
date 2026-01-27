@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import math
 from ultralytics import YOLO
 from time import perf_counter
@@ -18,6 +19,7 @@ DISTANCE_THRESHOLD = 50  # Pixels. If center distance > this, it's a new object.
 TRACKER_CLASS = TrackerKCF_create
 
 last_click = None
+appearances = {}    # Dict for storing time when a person with specific ID first appeared on screen
 
 def mouse_callback(event, x, y, flags, param):
     global last_click
@@ -198,6 +200,7 @@ def main():
                         'updated': True,
                         'misses_counter': 0
                     })
+                    appearances[global_id_counter] = {'first_appear': perf_counter(), 'last_appear': perf_counter()}
                     global_id_counter += 1
 
             cleaned_trackers = []
@@ -212,8 +215,11 @@ def main():
                     cleaned_trackers.append(obj)
             trackers = cleaned_trackers
 
+            curr_time = perf_counter()            
+            for obj in trackers:
+                id = obj['id']
+                appearances[id]['last_appear'] = curr_time
 
-            # trackers = [obj for obj in trackers if obj['updated']]
 
         for obj in trackers:
             success, bbox = obj['tracker'].update(frame)
@@ -270,7 +276,9 @@ def main():
         curr_time = perf_counter()
         fps = frame_count / (curr_time - start_time)
         cv2.putText(frame, f"FPS: {fps:.2f}", (5, 35), 0, 0.5, (0, 0, 255), 2)
-        prev_time = curr_time
+
+        mean_time_on_screen = np.mean([obj['last_appear']-obj['first_appear'] for obj in appearances.values()])
+        cv2.putText(frame, f"Mean time on screen: {mean_time_on_screen:.2f} s", (5, 55), 0, 0.5, (0, 0, 255), 2)
 
         frame_count += 1
         cv2.imshow(window_name, cv2.resize(frame, None, fx=1/SCALE_FACTOR, fy=1/SCALE_FACTOR))
