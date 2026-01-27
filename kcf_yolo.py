@@ -20,6 +20,7 @@ TRACKER_CLASS = TrackerKCF_create
 
 last_click = None
 appearances = {}    # Dict for storing time when a person with specific ID first appeared on screen
+traveled_distances = {}     # Dict for storing distance travelled by person with specific ID
 
 def mouse_callback(event, x, y, flags, param):
     global last_click
@@ -158,6 +159,7 @@ def main():
                     matched_obj['tracker'].init(frame, xyxy2xywh(det_box))
                     matched_obj['last_bbox'] = det_box
                     matched_obj['updated'] = True
+                    matched_obj['prev_center'] = get_center(det_box)
                 else:
                     not_matched_dets.append(det_box)
 
@@ -188,6 +190,7 @@ def main():
                     matched_obj['tracker'].init(frame, xyxy2xywh(det_box))
                     matched_obj['last_bbox'] = det_box
                     matched_obj['updated'] = True
+                    matched_obj['prev_center'] = get_center(det_box)
                 else:
                     # Create new object
                     new_tracker = TRACKER_CLASS()
@@ -198,9 +201,11 @@ def main():
                         'color': (0, 255, 0),
                         'last_bbox': det_box,
                         'updated': True,
-                        'misses_counter': 0
+                        'misses_counter': 0,
+                        'prev_center': get_center(det_box)
                     })
                     appearances[global_id_counter] = {'first_appear': perf_counter(), 'last_appear': perf_counter()}
+                    traveled_distances[global_id_counter] = 0.0
                     global_id_counter += 1
 
             cleaned_trackers = []
@@ -230,7 +235,18 @@ def main():
 
             bbox = xywh2xyxy(bbox)
 
-            is_selected = False
+            # Update the distance travelled
+            current_center = get_center(bbox)
+            prev_center = obj.get('prev_center', current_center)
+            
+            step_distance = math.hypot(current_center[0] - prev_center[0], current_center[1] - prev_center[1])
+            
+            if obj['id'] in traveled_distances:
+                traveled_distances[obj['id']] += step_distance
+            obj['prev_center'] = current_center
+
+
+            is_selected = False # If person is selected by user
 
             if last_click is not None:
                 is_selected = point_in_roi(bbox, last_click)
@@ -279,6 +295,16 @@ def main():
 
         mean_time_on_screen = np.mean([obj['last_appear']-obj['first_appear'] for obj in appearances.values()])
         cv2.putText(frame, f"Mean time on screen: {mean_time_on_screen:.2f} s", (5, 55), 0, 0.5, (0, 0, 255), 2)
+
+        speeds = []
+        for id, dist in traveled_distances.items():
+            duration = appearances[id]['last_appear'] - appearances[id]['first_appear']
+
+            if duration > 0.5: 
+                speeds.append(dist / duration)
+        
+        mean_speed = np.mean(speeds) if speeds else 0
+        cv2.putText(frame, f"Mean speed: {mean_speed:.2f} px/s", (5, 75), 0, 0.5, (0, 0, 255), 2)
 
         frame_count += 1
         cv2.imshow(window_name, cv2.resize(frame, None, fx=1/SCALE_FACTOR, fy=1/SCALE_FACTOR))
