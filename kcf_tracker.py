@@ -33,12 +33,12 @@ class KCFTracker:
         self._template_size = [padded_w, padded_h]
 
         roi_patch = image[y:y+h, x:x+w]
-        if roi_patch.size == 0: return False
         
         hsv_roi = cv2.cvtColor(roi_patch, cv2.COLOR_BGR2HSV)
 
         self._hist = self._calc_hist(hsv_roi, bins=[16, 16])
 
+        # Hanning window for smoothing
         hann_rows = np.hanning(padded_h)
         hann_cols = np.hanning(padded_w)
         self._hann = np.outer(hann_rows, hann_cols)[..., None].astype(np.float32)
@@ -53,7 +53,6 @@ class KCFTracker:
         self._alphaf = self._yf / (kf + self.lambdar)
         self._xf = xf
         
-        return True
 
     def update(self, image):
         if self._roi is None: return False, (0,0,0,0)
@@ -61,7 +60,10 @@ class KCFTracker:
         patch = self._get_subwindow(image, self._roi, self._template_size)
         zf = np.fft.fft2(patch, axes=(0,1))
         
+        # Correlation kernel
         kf = self._gaussian_correlation(self._xf, zf)
+
+        
         response_f = self._alphaf * kf
         response = np.fft.ifft2(response_f).real
         
