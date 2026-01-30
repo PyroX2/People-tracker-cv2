@@ -153,8 +153,6 @@ def main():
                         best_iou = iou
 
                 if matched_obj and best_iou > IOU_THRESHOLD:
-                    # YES -> Update existing tracker (Re-init to fix drift)
-                    # We do NOT increment the ID, we keep matched_obj['id']
                     matched_obj['tracker'] = TRACKER_CLASS()
                     matched_obj['tracker'].init(frame, xyxy2xywh(det_box))
                     matched_obj['last_bbox'] = det_box
